@@ -13,28 +13,6 @@ pipeline {
         TAG = ''
     }
     stages {
-        stage('Setup environment') {
-            steps {
-                echo 'Setting up environment'
-                script {
-                    // Determine whether this is staging or production build
-                    switch (env.BRANCH_NAME) {
-                        case 'dev':
-                            GLOBAL_ENVIRONMENT = 'staging'
-                            TAG = 'staging' + '-v1.' + VERSION
-                            break
-                        case 'main':
-                            GLOBAL_ENVIRONMENT = 'prod'
-                            TAG = 'prod' + '-v1.' + VERSION
-                            break
-                        default: 
-                            GLOBAL_ENVIRONMENT = 'NO_DEPLOYMENT'
-                            break
-                    }
-                }
-                echo "Environment: ${GLOBAL_ENVIRONMENT}"
-            }
-        }
         stage('SCA with OWASP Dependency Check') {
             steps {
                 dependencyCheck additionalArguments: '''
@@ -89,19 +67,6 @@ pipeline {
                 sh "docker push quyhoangtat/retail-store-checkout:${TAG}"
                 sh "docker push quyhoangtat/retail-store-catalog:${TAG}"
                 sh "docker push quyhoangtat/retail-store-assets:${TAG}" 
-            }
-        }
-        stage('Update Image Tag in Deployment File and Push to Git') {
-            steps {
-				withCredentials([usernamePassword(credentialsId: 'github-credential', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
-				sh """#!/bin/bash
-					   git clone ${GIT_REPO} --branch ${env.BRANCH_NAME}
-					   cd ${GIT_REPO_NAME}/${MANIFEST_PATH}
-					   sed -i "s/\\(quyhoangtat\\/retail-store-[^:]*:\\)[^ \\"]*/\\1${TAG}/g" ${DEPLOYMENT_FILE}
-                       git add . ; git commit -m "Update deployment file to version ${TAG} [ci skip]";git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/quyhoangtat/eks_cicd.git
-					   cd ..
-					   """
-				}				
             }
         }
         stage('Scan Docker Images with Trivy') {
